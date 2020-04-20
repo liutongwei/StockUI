@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <script type="text/javascript" src="{{ url_for('static', filename='js/jquery-3.4.1.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/echarts.min.js') }}"></script>
+    <script type="text/javascript" src="https://cdn.bootcss.com/popper.js/1.15.0/umd/popper.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.bootcss.com/dropdown.js/0.0.2dev/jquery.dropdown.css">
+    <script type="text/javascript" src="https://cdn.bootcss.com/dropdown.js/0.0.2dev/jquery.dropdown.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap-select.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/defaults-zh_CN.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap-select.min.css') }}">
+    <title>股票实时行情</title>
+    <style>
+        * {
+            margin: 0px;
+            padding-right: 20px;
+            padding-left: 20px;
+        }
+        #submit {
+            border-color: black;
+        }
+        #contractkindpicker {
+            width: 50%;
+        }
+        .bootstrap-select > .dropdown-toggle {
+            width: 97%;
+        }
+        #stockdata {
+            width: auto;
+            height: 450px;
+            display: none;
+            padding-top: 30px;
+        }
+        .filter-option-inner-inner {
+            padding-left: 0px;
+        }
+        .btn-info {
+            background-color: #8d98b3;
+            border-color: #8d98b3;
+        }
+    </style>
+</head>
+
+<body>
+    <br />
+    <div class="input-group">
+        <span class="input-group-addon" style="line-height: 2.2;">选择板块:</span>
+        <select class="selectpicker form-control"  data-style="btn-info" title="请选择股票对板块" name="picker1" id="pairspicker" >
+            {% for key, value in pairs.items() %}
+                <option value="{{ key }}">{{ key }}</option>
+            {% endfor %}
+        </select>
+        <span class="input-group-btn">
+            <button class="btn btn-default" type="submit" id="submit" onclick="fsubmit()">提交</button>
+        </span>
+    </div>
+    <h3 style="text-align:center; font:bold 10px; margin-top: 20px">板块股票实时行情</style></h3>
+    <br />
+    <div id="stockdata"></div>
+
+    <script type="text/javascript">
+        function getBaseUrl() {
+            let pathArray = location.href.split('/');
+            let protocol = pathArray[0];
+            let host = pathArray[2];
+            let url = protocol + '//' + host + '/';
+            return url;
+        }
+        let stockdata = echarts.init(document.getElementById("stockdata"));
+        let option = {
+            tooltip: {
+                trigger: 'axis'
+            },
+            title: {
+                text: '股票对实时价差'
+            },
+            toolbox: {
+                feature: {
+                    dataZoom: {
+                        yAxisIndex: 'none'
+                    },
+                    restore: {},
+                    saveAsImage: {}
+                }
+            },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: []
+            },
+            yAxis: [
+                {
+                    name: '价格',
+                    type: 'value'
+                },
+                {
+                    name: '涨跌幅差',
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '{value} %'
+                    }
+                }
+            ],
+            dataZoom: [
+                {
+                    type: 'slider',
+                    xAxisIndex: 0,
+                    filterMode: 'empty'
+                },
+                {
+                    type: 'slider',
+                    yAxisIndex: 0,
+                    filterMode: 'empty'
+                },
+                {
+                    type: 'inside',
+                    xAxisIndex: 0,
+                    filterMode: 'empty'
+                },
+                {
+                    type: 'inside',
+                    yAxisIndex: 0,
+                    filterMode: 'empty'
+                }
+            ],
+            series: [
+                {
+                    name: '',
+                    type: 'line',
+                    smooth: true,
+                    data: []
+                }
+            ]
+        };
+        stockdata.setOption(option);
+        let update_chart = (res) => {
+            stockdata.hideLoading();
+            let stock1 = Object.keys(res)[0];
+            let stock2 = Object.keys(res)[2];
+            stockdata.setOption({
+                xAxis: {
+                    data: res["Time"]
+                },
+                legend: {
+                    data: [stock1, stock2, "涨跌幅差"]
+                },
+                series: [{
+                    name: stock1,
+                    type: 'line',
+                    data: res[stock1]
+                },{
+                    name: stock2,
+                    type: 'line',
+                    data: res[stock2]
+                },{
+                    name: "涨跌幅差",
+                    type: 'line',
+                    yAxisIndex: 1,
+                    data: res["涨跌幅差"].map(item => {
+                        return item * 100.0;
+                    })
+                }]
+            });
+        }
+        $(window).resize(() => {
+            stockdata.resize();
+        });
+        function fsubmit() {
+            let pairs = $("#pairspicker").val();
+            if (pairs == null || pairs == "" || pairs == undefined) {
+                alert("请选择板块!!");
+            }
+            if (pairs != null && pairs != "") {
+                $.ajax({
+                    url: getBaseUrl(),
+                    type: "POST",
+                    contentType: "application/json; charset=UTF-8",
+                    data: JSON.stringify({pairs: pairs}),
+                    dataType: "json",
+                    success: (postdata) => {
+                        document.getElementById("stockdata").style.display = 'block';
+                        stockdata.resize();
+                        let socket = io(getBaseUrl() + "stockdata");
+                        socket.on("server_response", (res) => {
+                            // console.log(res);
+                            // console.log(Object.keys(res));
+                            update_chart(res);
+                        })
+                    },
+                    error: () => {
+                        console.log("error");
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>
