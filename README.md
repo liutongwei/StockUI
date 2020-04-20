@@ -1,3 +1,4 @@
+[![Platform](https://img.shields.io/badge/python-v3.7-blue)](https://img.shields.io/badge/python-v3.7-blue)
 # StockUI
 This is a website for intraday real-time monitor of arbitrage strategies in China stock market.
 
